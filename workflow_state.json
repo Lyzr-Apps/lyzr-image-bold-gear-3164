@@ -1,0 +1,53 @@
+{
+  "agents": [
+    {
+      "name": "Lyzr Style Transformer Agent",
+      "agent_id": "699c802522d60b5dbc439726",
+      "description": "Takes a user-uploaded image and regenerates it in Lyzr's brand style using the company's color palette (deep purples, vibrant blues, electric accents, clean gradients) and modern tech-forward aesthetic inspired by www.lyzr.ai. Outputs a styled image.",
+      "agent_type": "image",
+      "model": "gemini-2.5-pro",
+      "provider": "Google",
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "image_output_config": {
+        "model": "dall-e-3"
+      },
+      "file_output": false,
+      "voice_config": null,
+      "tool_configs": [],
+      "managed_agents": []
+    }
+  ],
+  "workflow": {
+    "nodes": [
+      {
+        "id": "input_node",
+        "type": "Input",
+        "label": "User Image Upload",
+        "nodeCategory": "input"
+      },
+      {
+        "id": "transformer_agent",
+        "type": "Agent",
+        "label": "Lyzr Style Transformer Agent",
+        "nodeCategory": "agent"
+      },
+      {
+        "id": "output_node",
+        "type": "Output",
+        "label": "Styled Image Output",
+        "nodeCategory": "end"
+      }
+    ],
+    "edges": [
+      {
+        "source": "input_node",
+        "target": "transformer_agent"
+      },
+      {
+        "source": "transformer_agent",
+        "target": "output_node"
+      }
+    ]
+  }
+}

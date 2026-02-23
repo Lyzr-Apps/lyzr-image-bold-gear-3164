@@ -1,0 +1,26 @@
+{
+  "agent_name": "Lyzr Style Transformer Agent",
+  "agent_id": "699c802522d60b5dbc439726",
+  "description": "Takes a user-uploaded image and regenerates it in Lyzr's brand style using the company's color palette (deep purples, vibrant blues, electric accents, clean gradients) and modern tech-forward aesthetic inspired by www.lyzr.ai. Outputs a styled image.",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "transformation_description": "string",
+    "style_elements_applied": "string",
+    "color_palette_used": "string"
+  },
+  "example_response": {
+    "transformation_description": "Description of how the image was transformed to match Lyzr brand style",
+    "style_elements_applied": "List of Lyzr brand style elements applied to the image",
+    "color_palette_used": "The specific Lyzr brand colors used in the transformation"
+  },
+  "has_module_outputs": true,
+  "module_outputs_example": {
+    "artifact_files": [
+      {
+        "file_url": "https://example.com/image.png"
+      }
+    ]
+  }
+}

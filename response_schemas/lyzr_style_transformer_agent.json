@@ -1,7 +1,7 @@
 {
   "agent_name": "Lyzr Style Transformer Agent",
   "agent_id": "699c802522d60b5dbc439726",
-  "description": "Takes a user-uploaded image and regenerates it in Lyzr's brand style using the company's color palette (deep purples, vibrant blues, electric accents, clean gradients) and modern tech-forward aesthetic inspired by www.lyzr.ai. Outputs a styled image.",
+  "description": "Takes a user-uploaded image and regenerates it in Lyzr's brand style using the company's color palette (deep purples, vibrant blues, electric accents, clean gradients) and modern tech-forward aesthetic inspired by www.lyzr.ai. Outputs a styled image using Gemini native image generation.",
   "agent_type": "json",
   "accessor": "json",
   "has_module_outputs": true,

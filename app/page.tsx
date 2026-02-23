@@ -27,6 +27,127 @@ const SAMPLE_TRANSFORMATION_DETAILS = {
 }
 const SAMPLE_IMAGE_URL = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop'
 
+/**
+ * Robust image URL extraction from AI agent response.
+ * Checks multiple possible paths where Gemini / DALL-E may return images.
+ */
+function extractImageUrl(result: AIAgentResponse): string | null {
+  // Path 1: module_outputs.artifact_files at top level
+  if (result.module_outputs?.artifact_files) {
+    const files = result.module_outputs.artifact_files
+    if (Array.isArray(files) && files.length > 0 && files[0]?.file_url) {
+      return files[0].file_url
+    }
+  }
+
+  // Path 2: module_outputs at top level with other structures
+  if (result.module_outputs) {
+    const mo = result.module_outputs as Record<string, any>
+    // Check for direct url fields
+    if (mo.url) return mo.url
+    if (mo.image_url) return mo.image_url
+    // Check for any nested array with file_url
+    for (const key of Object.keys(mo)) {
+      const val = mo[key]
+      if (Array.isArray(val) && val.length > 0 && val[0]?.file_url) {
+        return val[0].file_url
+      }
+      if (Array.isArray(val) && val.length > 0 && val[0]?.url) {
+        return val[0].url
+      }
+    }
+  }
+
+  // Path 3: response.result may contain image URL (Gemini inline)
+  const agentResult = result.response?.result
+  if (agentResult && typeof agentResult === 'object') {
+    const r = agentResult as Record<string, any>
+    if (r.image_url) return r.image_url
+    if (r.url) return r.url
+    if (r.image) return r.image
+    if (r.output_image) return r.output_image
+    if (r.generated_image) return r.generated_image
+    if (r.file_url) return r.file_url
+    // Check for nested artifact_files inside result
+    if (Array.isArray(r.artifact_files) && r.artifact_files.length > 0) {
+      return r.artifact_files[0]?.file_url || r.artifact_files[0]?.url || null
+    }
+    // Check module_outputs inside result
+    if (r.module_outputs?.artifact_files) {
+      const files = r.module_outputs.artifact_files
+      if (Array.isArray(files) && files.length > 0 && files[0]?.file_url) {
+        return files[0].file_url
+      }
+    }
+  }
+
+  // Path 4: Check response.message for URL patterns
+  const message = result.response?.message
+  if (message && typeof message === 'string') {
+    const urlMatch = message.match(/https?:\/\/[^\s"'<>]+\.(png|jpg|jpeg|webp|gif|svg|bmp)/i)
+    if (urlMatch) return urlMatch[0]
+  }
+
+  // Path 5: raw_response may contain image data
+  if (result.raw_response && typeof result.raw_response === 'string') {
+    try {
+      const raw = JSON.parse(result.raw_response)
+      if (raw?.module_outputs?.artifact_files) {
+        const files = raw.module_outputs.artifact_files
+        if (Array.isArray(files) && files.length > 0 && files[0]?.file_url) {
+          return files[0].file_url
+        }
+      }
+      // Check nested response in raw
+      if (raw?.response?.module_outputs?.artifact_files) {
+        const files = raw.response.module_outputs.artifact_files
+        if (Array.isArray(files) && files.length > 0 && files[0]?.file_url) {
+          return files[0].file_url
+        }
+      }
+    } catch {
+      // Not valid JSON, try URL pattern match
+      const urlMatch = result.raw_response.match(/https?:\/\/[^\s"'<>\\]+\.(png|jpg|jpeg|webp|gif)/i)
+      if (urlMatch) return urlMatch[0]
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extract transformation details from response with fallback handling
+ */
+function extractTransformationDetails(result: AIAgentResponse): {
+  transformation_description: string
+  style_elements_applied: string
+  color_palette_used: string
+} | null {
+  const agentResult = result.response?.result
+  if (agentResult && typeof agentResult === 'object') {
+    const r = agentResult as Record<string, any>
+    const desc = r.transformation_description || r.description || r.text || r.message || ''
+    const styles = r.style_elements_applied || r.styles || r.elements || ''
+    const colors = r.color_palette_used || r.colors || r.palette || ''
+    if (desc || styles || colors) {
+      return {
+        transformation_description: typeof desc === 'string' ? desc : JSON.stringify(desc),
+        style_elements_applied: typeof styles === 'string' ? styles : JSON.stringify(styles),
+        color_palette_used: typeof colors === 'string' ? colors : JSON.stringify(colors),
+      }
+    }
+  }
+  // Fallback: try to use response.message
+  if (result.response?.message) {
+    return {
+      transformation_description: result.response.message,
+      style_elements_applied: '',
+      color_palette_used: '',
+    }
+  }
+  return null
+}
+
 // --- Markdown Renderer ---
 function formatInline(text: string) {
   const parts = text.split(/\*\*(.*?)\*\*/g)
@@ -117,7 +238,7 @@ function AgentStatusCard({ isActive }: { isActive: boolean }) {
           <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-400 animate-pulse' : 'bg-muted-foreground/40'}`} />
           <div>
             <p className="text-xs font-semibold text-foreground">Lyzr Style Transformer Agent</p>
-            <p className="text-xs text-muted-foreground">Image generation -- DALL-E 3</p>
+            <p className="text-xs text-muted-foreground">Image generation -- Gemini</p>
           </div>
         </div>
         <Badge variant="outline" className={`text-xs ${isActive ? 'border-green-500/40 text-green-400' : 'border-border text-muted-foreground'}`}>
@@ -243,22 +364,20 @@ export default function Page() {
         throw new Error(result.error || result.response?.message || 'Transformation failed')
       }
 
-      // Step 4: Extract generated image from module_outputs (TOP LEVEL)
-      const artifactFiles = result.module_outputs?.artifact_files
-      if (Array.isArray(artifactFiles) && artifactFiles.length > 0) {
-        setResultImageUrl(artifactFiles[0].file_url)
+      // Step 4: Extract generated image using robust extraction
+      const imageUrl = extractImageUrl(result)
+      if (imageUrl) {
+        setResultImageUrl(imageUrl)
       } else {
+        // Log the full result for debugging
+        console.error('No image found in agent response. Full result:', JSON.stringify(result, null, 2))
         throw new Error('No image was generated. Please try again.')
       }
 
-      // Step 5: Extract transformation details
-      const agentResult = result.response?.result
-      if (agentResult && typeof agentResult === 'object') {
-        setTransformationDetails({
-          transformation_description: (agentResult as Record<string, string>).transformation_description || '',
-          style_elements_applied: (agentResult as Record<string, string>).style_elements_applied || '',
-          color_palette_used: (agentResult as Record<string, string>).color_palette_used || '',
-        })
+      // Step 5: Extract transformation details with fallback handling
+      const details = extractTransformationDetails(result)
+      if (details) {
+        setTransformationDetails(details)
       }
 
       setStatusMessage(null)
@@ -606,7 +725,7 @@ export default function Page() {
         <footer className="border-t border-border mt-8 py-4">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
             <p className="text-xs text-muted-foreground/50">
-              Powered by Lyzr AI -- Image generation via DALL-E 3
+              Powered by Lyzr AI -- Image generation via Gemini
             </p>
           </div>
         </footer>

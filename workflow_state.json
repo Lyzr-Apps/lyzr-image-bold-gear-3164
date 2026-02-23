@@ -10,7 +10,7 @@
       "temperature": 0.7,
       "top_p": 0.95,
       "image_output_config": {
-        "model": "dall-e-3"
+        "model": "gemini-2.0-flash-exp"
       },
       "file_output": false,
       "voice_config": null,
